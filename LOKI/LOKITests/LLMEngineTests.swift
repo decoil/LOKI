@@ -83,13 +83,13 @@ final class LLMEngineTests: XCTestCase {
     // MARK: - ModelDescriptor Tests
 
     func testModelDescriptorLocalPath() {
-        let model = ModelCatalog.qwen3_4B
+        let model = ModelCatalog.qwen3_1_7B
         XCTAssertTrue(model.localPath.contains("models"))
         XCTAssertTrue(model.localPath.hasSuffix(".gguf"))
     }
 
     func testModelCatalogRecommended() {
-        XCTAssertEqual(ModelCatalog.recommended.id, ModelCatalog.qwen3_4B.id)
+        XCTAssertEqual(ModelCatalog.recommended.id, ModelCatalog.qwen3_1_7B.id)
     }
 
     func testModelCatalogHasMultipleModels() {

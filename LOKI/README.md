@@ -26,7 +26,7 @@ LOKI/
 | Component | Technology |
 |-----------|-----------|
 | **LLM Runtime** | [llama.cpp](https://github.com/ggml-org/llama.cpp) via Swift Package |
-| **Default Model** | Qwen3 4B (Q4_K_M GGUF, ~2.5GB) |
+| **Default Model** | Qwen3 1.7B (Q4_K_M GGUF, ~1.2GB) |
 | **UI Framework** | SwiftUI + MVVM |
 | **Persistence** | SwiftData |
 | **Concurrency** | Swift Actors, async/await, AsyncThrowingStream |
@@ -34,13 +34,13 @@ LOKI/
 
 ## Recommended Model
 
-**Qwen3 4B** (Q4_K_M quantization) is the default model, selected for:
-- Best quality-per-parameter at this size (matches Qwen2.5-7B via distillation)
-- 119 language support, strong tool-calling, reasoning, and coding
-- ~2.5GB fits comfortably on 8GB RAM iPhones (iPhone 15 Pro+)
+**Qwen3 1.7B** (Q4_K_M quantization) is the default model, targeting iPhone 12+ (4GB RAM):
+- Distilled from Qwen3-235B — strongest tool-calling at this size
+- ~1.2GB leaves ~1.3GB headroom for KV cache and app on 4GB devices
+- 119 language support, reasoning, and coding capability
 - Apache 2.0 license (fully permissive)
 
-Alternative models available: Qwen3 1.7B, Phi-4 Mini, SmolLM3 3B, Qwen3 0.6B.
+Alternative models: Gemma 2 2B (1.5GB, smarter), Gemma 3 1B (700MB, lighter), SmolLM3 3B (1.9GB, smartest but tight fit), Qwen3 0.6B (490MB, fastest).
 
 ## Built-in Agent Tools
 
@@ -59,7 +59,7 @@ Alternative models available: Qwen3 1.7B, Phi-4 Mini, SmolLM3 3B, Qwen3 0.6B.
 
 ### Prerequisites
 - Xcode 16+
-- iOS 17+ device (iPhone 15 Pro or newer recommended)
+- iOS 17+ device (iPhone 12 or newer)
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) (optional, for project generation)
 
 ### Build
@@ -77,7 +77,7 @@ open Package.swift
 
 ### Run
 1. Build and run on a physical device (simulator lacks Metal GPU)
-2. On first launch, download Qwen3 4B from the model picker
+2. On first launch, download Qwen3 1.7B from the model picker
 3. Start chatting
 
 ## Design Decisions

@@ -5,7 +5,7 @@ import SwiftUI
 
 @MainActor
 final class SettingsViewModel: ObservableObject {
-    @AppStorage("contextSize") var contextSize = 4096
+    @AppStorage("contextSize") var contextSize = 2048
     @AppStorage("temperature") var temperature = 0.7
     @AppStorage("gpuLayers") var gpuLayers = 99
     @AppStorage("selectedPersona") var selectedPersona: AgentPrompts.Persona = .standard

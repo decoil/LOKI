@@ -137,7 +137,7 @@ struct LLMConfiguration: Sendable {
 
     static let `default` = LLMConfiguration(
         modelPath: "",
-        contextSize: 4096,
+        contextSize: 2048,
         gpuLayers: 99,
         temperature: 0.7,
         topP: 0.9,

@@ -34,7 +34,7 @@ struct ModelListView: View {
         } header: {
             Text("Recommended")
         } footer: {
-            Text("Qwen3 4B offers the best balance of quality, speed, and memory for iPhone.")
+            Text("Qwen3 1.7B has the best tool-calling and reasoning for an agentic AI on iPhone 12+. Only ~1.2GB.")
         }
         .listRowBackground(Theme.Colors.surface)
     }

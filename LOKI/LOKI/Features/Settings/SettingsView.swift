@@ -55,7 +55,7 @@ struct SettingsView: View {
                 Spacer()
                 Text("\(viewModel.contextSize)")
                     .foregroundStyle(Theme.Colors.secondaryText)
-                Stepper("", value: $viewModel.contextSize, in: 1024...8192, step: 1024)
+                Stepper("", value: $viewModel.contextSize, in: 512...4096, step: 512)
                     .labelsHidden()
                     .frame(width: 100)
             }
