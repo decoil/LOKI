@@ -20,14 +20,14 @@
     <string>1.0.0</string>
     <key>CFBundleVersion</key>
     <string>1</string>
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
     <key>LSRequiresIPhoneOS</key>
     <true/>
     <key>NSCalendarsUsageDescription</key>
     <string>LOKI needs calendar access to help manage your events.</string>
     <key>NSRemindersUsageDescription</key>
     <string>LOKI needs reminders access to create and manage reminders for you.</string>
-    <key>NSContactsUsageDescription</key>
-    <string>LOKI needs contacts access to help you find and communicate with people.</string>
     <key>UIApplicationSceneManifest</key>
     <dict>
         <key>UIApplicationSupportsMultipleScenes</key>

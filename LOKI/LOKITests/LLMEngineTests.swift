@@ -63,7 +63,7 @@ final class LLMEngineTests: XCTestCase {
 
     func testDefaultConfiguration() {
         let config = LLMConfiguration.default
-        XCTAssertEqual(config.contextSize, 4096)
+        XCTAssertEqual(config.contextSize, 2048)
         XCTAssertEqual(config.gpuLayers, 99)
         XCTAssertEqual(config.temperature, 0.7)
     }
@@ -97,7 +97,7 @@ final class LLMEngineTests: XCTestCase {
     }
 
     func testModelSizeFormatted() {
-        let model = ModelCatalog.qwen3_4B
+        let model = ModelCatalog.qwen3_1_7B
         XCTAssertFalse(model.sizeFormatted.isEmpty)
     }
 }

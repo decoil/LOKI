@@ -11,10 +11,7 @@ struct ConversationListView: View {
     @State private var showSettings = false
     @State private var showDeleteAlert = false
     @State private var conversationToDelete: ConversationEntity?
-
-    private var store: ConversationStore {
-        ConversationStore(modelContext: modelContext)
-    }
+    @State private var store: ConversationStore?
 
     var body: some View {
         NavigationStack {
@@ -43,7 +40,12 @@ struct ConversationListView: View {
             .navigationDestination(item: $selectedConversation) { conversation in
                 ChatView(conversationID: conversation.id)
             }
-            .onAppear { refreshConversations() }
+            .onAppear {
+                if store == nil {
+                    store = ConversationStore(modelContext: modelContext)
+                }
+                refreshConversations()
+            }
             .task { await appState.bootEngine() }
         }
         .tint(Theme.Colors.accent)
@@ -182,6 +184,7 @@ struct ConversationListView: View {
     // MARK: - Actions
 
     private func createNewConversation() {
+        guard let store else { return }
         do {
             let conv = try store.createConversation()
             refreshConversations()
@@ -192,16 +195,19 @@ struct ConversationListView: View {
     }
 
     private func deleteConversation(_ conversation: ConversationEntity) {
+        guard let store else { return }
         try? store.deleteConversation(conversation)
         refreshConversations()
     }
 
     private func togglePin(_ conversation: ConversationEntity) {
+        guard let store else { return }
         try? store.togglePin(conversation)
         refreshConversations()
     }
 
     private func refreshConversations() {
+        guard let store else { return }
         conversations = (try? store.fetchAll()) ?? []
     }
 }

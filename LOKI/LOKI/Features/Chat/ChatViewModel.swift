@@ -1,7 +1,6 @@
 import Foundation
 import SwiftData
 import SwiftUI
-import Combine
 
 // MARK: - Chat View Model
 
@@ -19,6 +18,7 @@ final class ChatViewModel: ObservableObject {
     private var agent: AgentCoordinator?
     private var conversation: ConversationEntity?
     private var generationTask: Task<Void, Never>?
+    private var isConfigured = false
 
     var canSend: Bool {
         !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isGenerating
@@ -28,7 +28,10 @@ final class ChatViewModel: ObservableObject {
         self.conversationID = conversationID
     }
 
+    /// Configure once — guards against repeated `.onAppear` calls.
     func configure(modelContext: ModelContext, agent: AgentCoordinator?) {
+        guard !isConfigured else { return }
+        isConfigured = true
         self.store = ConversationStore(modelContext: modelContext)
         self.agent = agent
         loadConversation()
@@ -58,49 +61,49 @@ final class ChatViewModel: ObservableObject {
 
         inputText = ""
 
-        // Add user message
         let userMessage = DisplayMessage(role: .user, content: text)
         messages.append(userMessage)
 
         do {
-            try store.addMessage(to: conversation, role: .user, content: text)
+            _ = try store.addMessage(to: conversation, role: .user, content: text)
         } catch {
             self.error = error.localizedDescription
         }
 
-        // Start generation
         isGenerating = true
         streamingText = ""
 
-        let assistantMessage = DisplayMessage(role: .assistant, content: "", isStreaming: true)
-        messages.append(assistantMessage)
-        let assistantIndex = messages.count - 1
+        // Use a stable ID to find the assistant message by identity, not index
+        let assistantID = UUID()
+        messages.append(DisplayMessage(id: assistantID, role: .assistant, content: "", isStreaming: true))
 
         let chatMessages = conversation.toChatMessages()
 
-        generationTask = Task {
+        generationTask = Task { [weak self] in
+            guard let self else { return }
+
             do {
                 let stream = agent.process(messages: chatMessages)
 
                 for try await event in stream {
                     switch event {
                     case .text(let token):
-                        streamingText += token
-                        messages[assistantIndex].content = streamingText
+                        self.streamingText += token
+                        self.updateMessage(id: assistantID, content: self.streamingText)
 
                     case .toolCallStarted(let name):
-                        activeToolName = name
+                        self.activeToolName = name
 
                     case .toolExecuting(let name):
-                        activeToolName = name
+                        self.activeToolName = name
 
                     case .toolResult(let name, let result):
-                        activeToolName = nil
-                        let toolMsg = DisplayMessage(
-                            role: .tool,
-                            content: "[\(name)] \(result)"
-                        )
-                        messages.insert(toolMsg, at: assistantIndex)
+                        self.activeToolName = nil
+                        let toolMsg = DisplayMessage(role: .tool, content: "[\(name)] \(result)")
+                        // Insert BEFORE assistant message — find by stable ID
+                        if let idx = self.messages.firstIndex(where: { $0.id == assistantID }) {
+                            self.messages.insert(toolMsg, at: idx)
+                        }
 
                     case .completed:
                         break
@@ -109,20 +112,22 @@ final class ChatViewModel: ObservableObject {
             } catch {
                 if !Task.isCancelled {
                     self.error = error.localizedDescription
-                    messages[assistantIndex].content = streamingText.isEmpty
+                    let fallback = self.streamingText.isEmpty
                         ? "Sorry, I encountered an error. Please try again."
-                        : streamingText
+                        : self.streamingText
+                    self.updateMessage(id: assistantID, content: fallback)
                 }
             }
 
             // Finalize
-            messages[assistantIndex].isStreaming = false
-            isGenerating = false
-            activeToolName = nil
+            self.finalizeMessage(id: assistantID)
+            self.isGenerating = false
+            self.activeToolName = nil
+            self.generationTask = nil
 
-            let finalContent = messages[assistantIndex].content
-            if !finalContent.isEmpty, let store, let conversation {
-                try? store.addMessage(to: conversation, role: .assistant, content: finalContent)
+            let content = self.messages.first(where: { $0.id == assistantID })?.content ?? ""
+            if !content.isEmpty {
+                try? store.addMessage(to: conversation, role: .assistant, content: content)
             }
         }
     }
@@ -131,19 +136,29 @@ final class ChatViewModel: ObservableObject {
         generationTask?.cancel()
         generationTask = nil
 
-        Task {
-            await agent?.cancel()
-        }
+        Task { await agent?.cancel() }
 
         isGenerating = false
         activeToolName = nil
 
-        if let lastIndex = messages.indices.last, messages[lastIndex].isStreaming {
-            messages[lastIndex].isStreaming = false
-            if messages[lastIndex].content.isEmpty {
-                messages[lastIndex].content = "*Generation stopped.*"
+        if let idx = messages.lastIndex(where: { $0.isStreaming }) {
+            messages[idx].isStreaming = false
+            if messages[idx].content.isEmpty {
+                messages[idx].content = "*Generation stopped.*"
             }
         }
+    }
+
+    // MARK: - Safe ID-based message mutation
+
+    private func updateMessage(id: UUID, content: String) {
+        guard let idx = messages.firstIndex(where: { $0.id == id }) else { return }
+        messages[idx].content = content
+    }
+
+    private func finalizeMessage(id: UUID) {
+        guard let idx = messages.firstIndex(where: { $0.id == id }) else { return }
+        messages[idx].isStreaming = false
     }
 }
 

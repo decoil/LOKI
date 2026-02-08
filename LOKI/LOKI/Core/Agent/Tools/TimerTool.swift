@@ -7,6 +7,9 @@ struct TimerTool: AgentTool {
     let name = "timer"
     let description = "Set a timer or alarm with a notification. Useful for cooking, reminders, etc."
 
+    /// Prefix for all LOKI timer notification identifiers.
+    private static let identifierPrefix = "loki-timer-"
+
     let parametersSchema = ToolParametersSchema(
         type: "object",
         properties: [
@@ -58,7 +61,7 @@ struct TimerTool: AgentTool {
             )
 
             let request = UNNotificationRequest(
-                identifier: "loki-timer-\(UUID().uuidString)",
+                identifier: "\(Self.identifierPrefix)\(UUID().uuidString)",
                 content: content,
                 trigger: trigger
             )
@@ -69,8 +72,18 @@ struct TimerTool: AgentTool {
             return .success("Timer set: \"\(label)\" in \(formatted)")
 
         case "cancel_all":
-            center.removeAllPendingNotificationRequests()
-            return .success("All pending timers cancelled.")
+            // Only remove LOKI timer notifications — not other app notifications
+            let pending = await center.pendingNotificationRequests()
+            let lokiTimerIDs = pending
+                .filter { $0.identifier.hasPrefix(Self.identifierPrefix) }
+                .map(\.identifier)
+
+            if lokiTimerIDs.isEmpty {
+                return .success("No pending timers to cancel.")
+            }
+
+            center.removePendingNotificationRequests(withIdentifiers: lokiTimerIDs)
+            return .success("Cancelled \(lokiTimerIDs.count) pending timer(s).")
 
         default:
             return .error("Unknown action: \(action)")

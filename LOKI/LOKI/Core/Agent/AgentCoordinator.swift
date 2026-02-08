@@ -9,6 +9,7 @@ final class AgentCoordinator: ObservableObject {
     private let engine: LlamaCppEngine
     private let toolRegistry = ToolRegistry()
     private let maxIterations = 5
+    private var currentTask: Task<Void, Never>?
 
     @Published private(set) var isProcessing = false
     @Published private(set) var currentToolExecution: String?
@@ -26,7 +27,7 @@ final class AgentCoordinator: ObservableObject {
         parameters: GenerationParameters = .default
     ) -> AsyncThrowingStream<AgentEvent, Error> {
         AsyncThrowingStream { continuation in
-            Task { @MainActor [weak self] in
+            let task = Task { @MainActor [weak self] in
                 guard let self else {
                     continuation.finish()
                     return
@@ -35,6 +36,7 @@ final class AgentCoordinator: ObservableObject {
                 defer {
                     self.isProcessing = false
                     self.currentToolExecution = nil
+                    self.currentTask = nil
                 }
 
                 do {
@@ -44,15 +46,28 @@ final class AgentCoordinator: ObservableObject {
                         continuation: continuation
                     )
                 } catch {
-                    continuation.finish(throwing: error)
+                    if !Task.isCancelled {
+                        continuation.finish(throwing: error)
+                    } else {
+                        continuation.finish()
+                    }
                 }
+            }
+
+            self.currentTask = task
+
+            continuation.onTermination = { @Sendable _ in
+                task.cancel()
             }
         }
     }
 
     func cancel() async {
+        currentTask?.cancel()
+        currentTask = nil
         await engine.cancelGeneration()
         isProcessing = false
+        currentToolExecution = nil
     }
 
     // MARK: - Agent Loop
@@ -74,6 +89,8 @@ final class AgentCoordinator: ObservableObject {
         }
 
         for iteration in 0..<maxIterations {
+            try Task.checkCancellation()
+
             var accumulatedText = ""
             var pendingToolCalls: [ToolCall] = []
             var finishReason: FinishReason = .stop
@@ -99,8 +116,10 @@ final class AgentCoordinator: ObservableObject {
                 }
             }
 
-            // If no tool calls, we're done
-            guard finishReason == .toolUse, !pendingToolCalls.isEmpty else {
+            // Execute tool calls if any were emitted, regardless of finishReason.
+            // Small models may not always set finishReason to .toolUse even when
+            // they emit valid tool calls via <tool_call> tags.
+            guard !pendingToolCalls.isEmpty else {
                 continuation.yield(.completed)
                 continuation.finish()
                 return
@@ -115,6 +134,8 @@ final class AgentCoordinator: ObservableObject {
 
             // Execute tools
             for call in pendingToolCalls {
+                try Task.checkCancellation()
+
                 currentToolExecution = call.name
                 continuation.yield(.toolExecuting(call.name))
 

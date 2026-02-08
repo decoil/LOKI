@@ -11,6 +11,7 @@ final class ModelManager {
     private(set) var downloadProgress: [String: DownloadProgress] = [:]
     private(set) var activeModel: ModelDescriptor?
     private var downloadTasks: [String: URLSessionDownloadTask] = [:]
+    private var downloadSessions: [String: URLSession] = [:]
     private let fileManager = FileManager.default
 
     struct DownloadProgress: Sendable {
@@ -64,13 +65,17 @@ final class ModelManager {
 
         let task = session.downloadTask(with: model.downloadURL)
         downloadTasks[model.id] = task
-        task.resume()
+        downloadSessions[model.id] = session
 
-        // Await completion through delegate
+        // Set completion BEFORE resuming — eliminates race condition where
+        // the delegate fires before the continuation body assigns the handler.
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
             delegate.completion = { [weak self] result in
                 Task { @MainActor [weak self] in
                     self?.downloadTasks.removeValue(forKey: model.id)
+                    // Invalidate session to prevent memory leak
+                    self?.downloadSessions.removeValue(forKey: model.id)?.invalidateAndCancel()
+
                     switch result {
                     case .success(let tempURL):
                         do {
@@ -87,12 +92,16 @@ final class ModelManager {
                     }
                 }
             }
+
+            // Resume AFTER completion handler is set
+            task.resume()
         }
     }
 
     func cancelDownload(_ modelID: String) {
         downloadTasks[modelID]?.cancel()
         downloadTasks.removeValue(forKey: modelID)
+        downloadSessions.removeValue(forKey: modelID)?.invalidateAndCancel()
         downloadProgress[modelID]?.status = .cancelled
     }
 
@@ -141,14 +150,22 @@ final class ModelManager {
 
 // MARK: - Download Delegate
 
-private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
+/// Thread-safe download delegate. The `completion` property is protected by a lock
+/// since it is set from the MainActor continuation and read from the URLSession delegate queue.
+private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate, Sendable {
     let modelID: String
-    let progressHandler: (ModelManager.DownloadProgress) -> Void
-    var completion: ((Result<URL, Error>) -> Void)?
+    let progressHandler: @Sendable (ModelManager.DownloadProgress) -> Void
+
+    private let _completion = OSAllocatedUnfairLock<((Result<URL, Error>) -> Void)?>(initialState: nil)
+
+    var completion: ((Result<URL, Error>) -> Void)? {
+        get { _completion.withLock { $0 } }
+        set { _completion.withLock { $0 = newValue } }
+    }
 
     init(
         modelID: String,
-        progressHandler: @escaping (ModelManager.DownloadProgress) -> Void
+        progressHandler: @escaping @Sendable (ModelManager.DownloadProgress) -> Void
     ) {
         self.modelID = modelID
         self.progressHandler = progressHandler

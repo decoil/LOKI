@@ -54,14 +54,22 @@ struct CalendarTool: AgentTool {
             return .error("Calendar access denied. Please enable in Settings > Privacy > Calendars.")
         }
 
+        let cal = Calendar.current
+
         switch action {
         case "list_today":
-            return listEvents(from: Calendar.current.startOfDay(for: Date()),
-                            to: Calendar.current.startOfDay(for: Date()).addingTimeInterval(86400))
+            let start = cal.startOfDay(for: Date())
+            guard let end = cal.date(byAdding: .day, value: 1, to: start) else {
+                return .error("Failed to compute end of day.")
+            }
+            return listEvents(from: start, to: end)
 
         case "list_upcoming":
-            return listEvents(from: Date(),
-                            to: Date().addingTimeInterval(7 * 86400))
+            let now = Date()
+            guard let end = cal.date(byAdding: .day, value: 7, to: now) else {
+                return .error("Failed to compute date range.")
+            }
+            return listEvents(from: now, to: end)
 
         case "create":
             return try await createEvent(arguments: arguments)
@@ -107,12 +115,19 @@ struct CalendarTool: AgentTool {
 
         let startDate: Date
         if let dateString {
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            guard let parsed = formatter.date(from: dateString) else {
+            // Try with fractional seconds first, then without.
+            // LLMs may emit either format.
+            let withFrac = ISO8601DateFormatter()
+            withFrac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+            let withoutFrac = ISO8601DateFormatter()
+            withoutFrac.formatOptions = [.withInternetDateTime]
+
+            if let parsed = withFrac.date(from: dateString) ?? withoutFrac.date(from: dateString) {
+                startDate = parsed
+            } else {
                 return .error("Invalid date format. Use ISO 8601 (e.g., 2024-12-25T14:00:00Z)")
             }
-            startDate = parsed
         } else {
             // Default to next hour
             let now = Date()
@@ -139,8 +154,9 @@ struct CalendarTool: AgentTool {
     }
 
     private func searchEvents(query: String) -> ToolOutput {
-        let startDate = Date().addingTimeInterval(-30 * 86400)
-        let endDate = Date().addingTimeInterval(90 * 86400)
+        let cal = Calendar.current
+        let startDate = cal.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+        let endDate = cal.date(byAdding: .day, value: 90, to: Date()) ?? Date()
         let predicate = store.predicateForEvents(withStart: startDate, end: endDate, calendars: nil)
         let events = store.events(matching: predicate)
             .filter { ($0.title ?? "").localizedCaseInsensitiveContains(query) }

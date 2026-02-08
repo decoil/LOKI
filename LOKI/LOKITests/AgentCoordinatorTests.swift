@@ -121,6 +121,7 @@ final class AgentCoordinatorTests: XCTestCase {
 
     // MARK: - Display Message Tests
 
+    @MainActor
     func testDisplayMessageInit() {
         let msg = DisplayMessage(role: .user, content: "Test")
         XCTAssertEqual(msg.role, .user)

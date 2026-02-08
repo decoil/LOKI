@@ -58,7 +58,11 @@ final class AppState: ObservableObject {
     }
 
     func bootEngine() async {
-        guard engineStatus != .loading else { return }
+        // Only boot from idle or error — skip if already loading or ready
+        switch engineStatus {
+        case .loading, .ready: return
+        case .idle, .error: break
+        }
         engineStatus = .loading
 
         do {
@@ -67,11 +71,18 @@ final class AppState: ObservableObject {
                 return
             }
 
+            // Read user-configured settings, falling back to model defaults
+            let contextSize = Int32(UserDefaults.standard.object(forKey: "contextSize") as? Int
+                ?? Int(activeModel.contextSize))
+            let gpuLayers = Int32(UserDefaults.standard.object(forKey: "gpuLayers") as? Int
+                ?? Int(activeModel.recommendedGPULayers))
+            let temperature = Float(UserDefaults.standard.object(forKey: "temperature") as? Double ?? 0.7)
+
             let config = LLMConfiguration(
                 modelPath: activeModel.localPath,
-                contextSize: activeModel.contextSize,
-                gpuLayers: activeModel.recommendedGPULayers,
-                temperature: 0.7,
+                contextSize: contextSize,
+                gpuLayers: gpuLayers,
+                temperature: temperature,
                 topP: 0.9,
                 seed: UInt32.random(in: 0...UInt32.max)
             )

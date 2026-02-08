@@ -1,12 +1,10 @@
 import Foundation
 import SwiftData
-import SwiftUI
 
 // MARK: - Conversation Store
 
 /// Manages conversation CRUD operations backed by SwiftData.
 @MainActor
-@Observable
 final class ConversationStore {
     private let modelContext: ModelContext
 
@@ -58,8 +56,9 @@ final class ConversationStore {
         )
         message.toolCalls = toolCalls
         message.toolResult = toolResult
+        // Setting the inverse relationship is sufficient — SwiftData manages both sides.
+        // Do NOT also append to conversation.messages (causes duplicate insertion).
         message.conversation = conversation
-        conversation.messages.append(message)
         conversation.updatedAt = Date()
 
         // Auto-generate title from first user message

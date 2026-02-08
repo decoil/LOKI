@@ -5,22 +5,23 @@ let package = Package(
     name: "LOKI",
     platforms: [.iOS(.v17)],
     products: [
-        .library(name: "LOKICore", targets: ["LOKICore"]),
+        .library(name: "LOKI", targets: ["LOKI"]),
     ],
     dependencies: [
         .package(url: "https://github.com/ggml-org/llama.cpp.git", from: "1.0.0"),
     ],
     targets: [
         .target(
-            name: "LOKICore",
+            name: "LOKI",
             dependencies: [
                 .product(name: "llama", package: "llama.cpp"),
             ],
-            path: "LOKI/Core"
+            path: "LOKI",
+            exclude: ["Info.plist", "LOKI.entitlements"]
         ),
         .testTarget(
             name: "LOKITests",
-            dependencies: ["LOKICore"],
+            dependencies: ["LOKI"],
             path: "LOKITests"
         ),
     ]

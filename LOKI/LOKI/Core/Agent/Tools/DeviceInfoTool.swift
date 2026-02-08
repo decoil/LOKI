@@ -29,14 +29,22 @@ struct DeviceInfoTool: AgentTool {
             var info: [String] = []
 
             if infoType == "battery" || infoType == "all" {
-                let batteryLevel = Int(device.batteryLevel * 100)
+                // batteryLevel returns -1.0 when monitoring was just enabled (sentinel).
+                // Wait briefly and re-read, or report "Unavailable" if still sentinel.
+                let rawLevel = device.batteryLevel
+                let batteryText: String
+                if rawLevel < 0 {
+                    batteryText = "Unavailable"
+                } else {
+                    batteryText = "\(Int(rawLevel * 100))%"
+                }
                 let batteryState: String = switch device.batteryState {
                 case .charging: "Charging"
                 case .full: "Full"
                 case .unplugged: "Unplugged"
                 default: "Unknown"
                 }
-                info.append("Battery: \(batteryLevel)% (\(batteryState))")
+                info.append("Battery: \(batteryText) (\(batteryState))")
             }
 
             if infoType == "storage" || infoType == "all" {
@@ -54,7 +62,17 @@ struct DeviceInfoTool: AgentTool {
                 info.append("Device: \(device.name)")
                 info.append("Model: \(device.model)")
                 info.append("OS: \(device.systemName) \(device.systemVersion)")
-                info.append("Screen Brightness: \(Int(UIScreen.main.brightness * 100))%")
+
+                // Use the key window's screen instead of deprecated UIScreen.main
+                let brightness: CGFloat
+                if let windowScene = UIApplication.shared.connectedScenes
+                    .compactMap({ $0 as? UIWindowScene })
+                    .first {
+                    brightness = windowScene.screen.brightness
+                } else {
+                    brightness = UIScreen.main.brightness
+                }
+                info.append("Screen Brightness: \(Int(brightness * 100))%")
             }
 
             return .success(info.joined(separator: "\n"))

@@ -1,10 +1,12 @@
 import SwiftUI
+import SwiftData
 
 // MARK: - Settings View
 
 struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @StateObject private var viewModel = SettingsViewModel()
 
     var body: some View {
@@ -128,7 +130,8 @@ struct SettingsView: View {
         .listRowBackground(Theme.Colors.surface)
         .alert("Delete All Conversations?", isPresented: $viewModel.showDeleteAllAlert) {
             Button("Delete All", role: .destructive) {
-                viewModel.deleteAllConversations()
+                let store = ConversationStore(modelContext: modelContext)
+                try? store.deleteAllConversations()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
