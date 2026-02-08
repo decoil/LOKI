@@ -1,0 +1,67 @@
+name: LOKI
+options:
+  bundleIdPrefix: com.loki
+  deploymentTarget:
+    iOS: "17.0"
+  xcodeVersion: "16.0"
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    ENABLE_USER_SCRIPT_SANDBOXING: false
+
+packages:
+  llama.cpp:
+    url: https://github.com/ggml-org/llama.cpp
+    from: "1.0.0"
+
+targets:
+  LOKI:
+    type: application
+    platform: iOS
+    sources:
+      - LOKI
+    settings:
+      base:
+        INFOPLIST_FILE: LOKI/Info.plist
+        CODE_SIGN_ENTITLEMENTS: LOKI/LOKI.entitlements
+        PRODUCT_BUNDLE_IDENTIFIER: com.loki.app
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        SWIFT_STRICT_CONCURRENCY: complete
+    dependencies:
+      - package: llama.cpp
+        product: llama
+    entitlements:
+      path: LOKI/LOKI.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+
+  LOKITests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - LOKITests
+    dependencies:
+      - target: LOKI
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.loki.app.tests
+
+schemes:
+  LOKI:
+    build:
+      targets:
+        LOKI: all
+        LOKITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - LOKITests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
